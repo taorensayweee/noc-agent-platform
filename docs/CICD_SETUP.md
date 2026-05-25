@@ -29,15 +29,7 @@
 
 | Secret 名称 | 值 | 说明 |
 |-------------|-----|------|
-| `GITEE_USERNAME` | 你的 Gitee 用户名 | Gitee 账号用户名 |
-| `GITEE_PASSWORD` | 你的 Gitee 密码 | Gitee 账号密码或个人访问令牌 |
-
-### Gitcode 同步（可选）
-
-| Secret 名称 | 值 | 说明 |
-|-------------|-----|------|
-| `GITCODE_USERNAME` | 你的 Gitcode 用户名 | Gitcode 账号用户名 |
-| `GITCODE_TOKEN` | 你的 Gitcode Token | Gitcode 个人访问令牌 |
+| `GITEE_TOKEN` | 你的 Gitee Token | Gitee 个人访问令牌（PAT） |
 
 > 💡 Gitee Token 获取：[Gitee 设置 → 私人令牌](https://gitee.com/profile/personal_access_tokens)
 > 💡 Gitcode Token 获取：[Gitcode 设置 → 访问令牌](https://gitcode.com/-/user_settings/access_tokens)

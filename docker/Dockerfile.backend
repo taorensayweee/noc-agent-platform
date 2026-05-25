@@ -37,7 +37,7 @@ FROM node:20-slim
 LABEL maintainer="谭策 <huawei_network@foxmail.com>" \
       org.opencontainers.image.title="ITOps Agent Platform Backend" \
       org.opencontainers.image.description="Enterprise IT Operations Multi-Agent Automation Platform - Backend API Server" \
-      org.opencontainers.image.source="https://github.com/your-org/ITOpsAgent" \
+      org.opencontainers.image.source="https://github.com/qinshihu/itops-agent-platform" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.vendor="谭策" \
       org.opencontainers.image.url="https://www.zjzwfw.cloud/ITOpsAgentinfo"

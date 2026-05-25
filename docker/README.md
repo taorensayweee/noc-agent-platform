@@ -32,15 +32,6 @@ docker pull registry.cn-hangzhou.aliyuncs.com/huluwa666/tsq-images-hub:IT_Onlin-
 docker pull registry.cn-hangzhou.aliyuncs.com/huluwa666/tsq-images-hub:IT_Onlin-ITOps-frontend-latest
 ```
 
-### Simplified Version (Lightweight)
-```bash
-# Backend simplified version
-docker pull registry.cn-hangzhou.aliyuncs.com/huluwa666/tsq-images-hub:backend-simple-v3.0.1
-
-# Frontend (same as standard)
-docker pull registry.cn-hangzhou.aliyuncs.com/huluwa666/tsq-images-hub:frontend-v3.0.1
-```
-
 ## 🚀 Quick Start
 
 ### Using Docker Compose (Recommended)
