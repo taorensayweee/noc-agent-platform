@@ -29,7 +29,7 @@ docker pull registry.cn-hangzhou.aliyuncs.com/huluwa666/tsq-images-hub:itops-bac
 ### Frontend Web UI
 ```bash
 # Versioned tag (Recommended)
-docker pull registry.cn-hangzhou.aliyuncs.com/huluwa666/tsq-images-hub:itops-frontend-v3.0.1
+docker pull registry.cn-hangzhou.aliyuncs.com/huluwa666/tsq-images-hub:frontend-v3.0.1
 ```
 
 ### Simplified Version (Lightweight)
@@ -38,7 +38,7 @@ docker pull registry.cn-hangzhou.aliyuncs.com/huluwa666/tsq-images-hub:itops-fro
 docker pull registry.cn-hangzhou.aliyuncs.com/huluwa666/tsq-images-hub:backend-simple-v3.0.1
 
 # Frontend (same as standard)
-docker pull registry.cn-hangzhou.aliyuncs.com/huluwa666/tsq-images-hub:itops-frontend-v3.0.1
+docker pull registry.cn-hangzhou.aliyuncs.com/huluwa666/tsq-images-hub:frontend-v3.0.1
 ```
 
 ## 🚀 Quick Start
@@ -69,7 +69,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: registry.cn-hangzhou.aliyuncs.com/huluwa666/tsq-images-hub:itops-frontend-v3.0.1
+    image: registry.cn-hangzhou.aliyuncs.com/huluwa666/tsq-images-hub:frontend-v3.0.1
     container_name: itops-frontend
     ports:
       - "8080:80"
@@ -109,7 +109,7 @@ docker run -d \
   -p 8080:80 \
   --link itops-backend \
   -e BACKEND_URL=http://itops-backend:3001 \
-  registry.cn-hangzhou.aliyuncs.com/huluwa666/tsq-images-hub:itops-frontend-v3.0.1
+  registry.cn-hangzhou.aliyuncs.com/huluwa666/tsq-images-hub:frontend-v3.0.1
 ```
 
 ## ⚙️ Configuration

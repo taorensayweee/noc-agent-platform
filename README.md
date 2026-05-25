@@ -86,7 +86,7 @@ docker-compose up -d --build
 ```bash
 # 拉取镜像
 docker pull registry.cn-hangzhou.aliyuncs.com/huluwa666/tsq-images-hub:itops-backend-v3.0.1
-docker pull registry.cn-hangzhou.aliyuncs.com/huluwa666/tsq-images-hub:itops-frontend-v3.0.1
+docker pull registry.cn-hangzhou.aliyuncs.com/huluwa666/tsq-images-hub:frontend-v3.0.1
 
 # 启动服务
 docker-compose up -d

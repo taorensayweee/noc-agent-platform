@@ -58,7 +58,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile.frontend
     # For using pre-built images from registry (uncomment):
-    # image: registry.cn-hangzhou.aliyuncs.com/huluwa666/tsq-images-hub:itops-frontend-v3.0.1
+    # image: registry.cn-hangzhou.aliyuncs.com/huluwa666/tsq-images-hub:frontend-v3.0.1
     container_name: itops-frontend
     networks:
       - itops-network
