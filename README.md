@@ -1,6 +1,3 @@
-# ITOps Agent Platform
-
----
 # 🚀 Weee! NOC 定制版 (v2.0)
 本项目已从原 `ITOps Agent Platform` 深度 Fork 并重构，专为 Weee! NOC 团队和 SRE 体系量身定制。
 
