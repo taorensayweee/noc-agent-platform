@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import db from '../models/database';
 import { logger } from '../utils/logger';
-import { callDoubaoAPI } from './llmService';
+import { generateCompletion } from './llmService';
 import EnhancedRAGService from './enhancedRAGService';
 
 interface AgentDB {
@@ -80,11 +80,12 @@ ${agentDescriptions}
 请选择最适合处理此请求的Agent，只返回Agent的ID，不要其他内容。`;
 
     try {
-      const result = await callDoubaoAPI(
+      const result = await generateCompletion(
         routingPrompt,
         '你是一个智能的Agent选择助手，擅长将任务分配给最适合的专家。',
-        'Agent Router',
-        0.3
+        0.3,
+        undefined,
+        'Agent Router'
       );
 
       const matchedAgent = availableAgents.find(agent => 
@@ -262,11 +263,12 @@ ${agentDescriptions}
     
     try {
       // 调用Agent
-      const response = await callDoubaoAPI(
+      const response = await generateCompletion(
         conversation,
         currentAgent.system_prompt || '你是一个专业的IT运维助手。',
-        currentAgent.name,
-        currentAgent.temperature || 0.7
+        currentAgent.temperature || 0.7,
+        undefined,
+        currentAgent.name
       );
 
       // 记录响应
@@ -420,11 +422,12 @@ ${formatted}
    * 检测委托循环
    */
   private detectDelegationCycle(targetAgentId: string): boolean {
-    if (this.context.delegationChain.includes(targetAgentId)) {
+    this.context.delegationChain.push(targetAgentId);
+    // Allow an agent to be called up to 5 times in a single workflow (e.g. asking for 5 different commands)
+    const count = this.context.delegationChain.filter(id => id === targetAgentId).length;
+    if (count > 5) {
       return true;
     }
-    
-    this.context.delegationChain.push(targetAgentId);
     return false;
   }
 
@@ -448,23 +451,24 @@ ${formatted}
       `${msg.name || msg.role}: ${msg.content}`
     ).join('\n\n');
 
-    const summaryPrompt = `请对以下多Agent协作过程进行总结，包括：
-1. 问题概述
-2. 主要发现
-3. 解决方案
-4. 后续建议
+    const summaryPrompt = `请对以下多Agent协作过程提取最核心的结论：
+忽略那些客套话、格式化的大标题或繁琐的排查步骤。
+直接告诉我：
+1. 到底出了什么问题（根因可能是啥）？
+2. 要怎么修复？
+
+请用非常简短、直接的大白话回答，不要生成长篇大论的正式报告。
 
 对话历史:
-${conversationText}
-
-请提供一个专业、结构化的总结报告。`;
+${conversationText}`;
 
     try {
-      const summary = await callDoubaoAPI(
+      const summary = await generateCompletion(
         summaryPrompt,
         '你是一个专业的报告生成助手，擅长总结复杂的技术讨论。',
-        'Summary Generator',
-        0.5
+        0.5,
+        undefined,
+        'Summary Generator'
       );
 
       this.context.conversationHistory.push({

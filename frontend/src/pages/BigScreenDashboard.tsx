@@ -219,6 +219,7 @@ export default function BigScreenDashboard() {
   });
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInputValue, setTitleInputValue] = useState(dashboardTitle);
+  const [selectedServerId, setSelectedServerId] = useState<string>('all');
   
   const prevCriticalCountRef = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -495,8 +496,12 @@ export default function BigScreenDashboard() {
   useEffect(() => {
     if (serverMetricsData?.has_real_data && serverMetricsData.cpu_history.length > 0) {
       const aggregateMetric = (history: Array<{ server_id: string; value: number; timestamp: string }>) => {
+        const filteredHistory = selectedServerId === 'all' 
+          ? history 
+          : history.filter(h => h.server_id === selectedServerId);
+          
         const timeMap = new Map<string, number[]>();
-        history.forEach(h => {
+        filteredHistory.forEach(h => {
           if (!timeMap.has(h.timestamp)) timeMap.set(h.timestamp, []);
           timeMap.get(h.timestamp)!.push(h.value);
         });
@@ -524,7 +529,7 @@ export default function BigScreenDashboard() {
       }, 3000);
       return () => clearInterval(interval);
     }
-  }, [serverMetricsData]);
+  }, [serverMetricsData, selectedServerId]);
 
   const alertTrendData = (alertTrends || []).map(t => ({
     timestamp: new Date(t.time_bucket).getTime(),
@@ -538,20 +543,19 @@ export default function BigScreenDashboard() {
 
   const serverMetrics = useMemo(() => {
     if (serverMetricsData?.has_real_data && serverMetricsData.servers.length > 0) {
-      return serverMetricsData.servers.slice(0, 6).map((s, i) => ({
-        label: s.server_name.substring(0, 8),
-        value: s.cpu_usage ?? 0,
-        color: SERVER_COLORS[i],
+      return serverMetricsData.servers.map((s, i) => ({
+        label: s.server_name, // Removed the .substring limit so full names show
+        value: s.disk_usage ?? 0,
+        color: SERVER_COLORS[i % SERVER_COLORS.length],
       }));
     }
     if ((servers || []).some(s => s.enabled === 1)) {
       return (servers || [])
         .filter(s => s.enabled === 1)
-        .slice(0, 6)
         .map((s, i) => ({
-          label: s.name.substring(0, 8),
-          value: SERVER_METRICS_RANDOM_VALUES[i],
-          color: SERVER_COLORS[i],
+          label: s.name, // Removed the .substring limit so full names show
+          value: 0,
+          color: SERVER_COLORS[i % SERVER_COLORS.length],
         }));
     }
     return [];
@@ -559,11 +563,15 @@ export default function BigScreenDashboard() {
 
   const aggregatedMetrics = useMemo(() => {
     if (serverMetricsData?.has_real_data && serverMetricsData.servers.length > 0) {
-      const validCpu = serverMetricsData.servers.filter(s => s.cpu_usage !== null);
-      const validMem = serverMetricsData.servers.filter(s => s.memory_usage !== null);
-      const validNetIn = serverMetricsData.servers.filter(s => s.network_in_mbps !== null);
-      const validNetOut = serverMetricsData.servers.filter(s => s.network_out_mbps !== null);
-      const validDisk = serverMetricsData.servers.filter(s => s.disk_usage !== null);
+      const serversToProcess = selectedServerId === 'all'
+        ? serverMetricsData.servers
+        : serverMetricsData.servers.filter(s => s.server_id === selectedServerId);
+
+      const validCpu = serversToProcess.filter(s => s.cpu_usage !== null);
+      const validMem = serversToProcess.filter(s => s.memory_usage !== null);
+      const validNetIn = serversToProcess.filter(s => s.network_in_mbps !== null);
+      const validNetOut = serversToProcess.filter(s => s.network_out_mbps !== null);
+      const validDisk = serversToProcess.filter(s => s.disk_usage !== null);
 
       return {
         cpu: validCpu.length > 0 ? validCpu.reduce((sum, s) => sum + (s.cpu_usage ?? 0), 0) / validCpu.length : null,
@@ -580,7 +588,7 @@ export default function BigScreenDashboard() {
       networkOut: (networkData[networkData.length - 1]?.value ?? 100) / 2,
       disk: diskIOData[diskIOData.length - 1]?.value ?? 50,
     };
-  }, [serverMetricsData, cpuData, memoryData, networkData, diskIOData]);
+  }, [serverMetricsData, cpuData, memoryData, networkData, diskIOData, selectedServerId]);
 
   const taskDistData = (taskDistribution?.byStatus || []).map(s => {
     const colors: Record<string, string> = {
@@ -711,7 +719,6 @@ export default function BigScreenDashboard() {
           {/* 顶部中间快捷入口 */}
           <div className="flex items-center gap-2">
             {[
-              { icon: Globe, label: '官网', color: 'text-blue-400', href: 'https://www.zjzwfw.cloud/' },
               { icon: Terminal, label: '终端', color: 'text-green-400', href: '/terminal' },
               { icon: FileCode, label: '脚本', color: 'text-purple-400', href: '/scripts' },
               { icon: Shield, label: '审计', color: 'text-yellow-400', href: '/audit' },
@@ -769,6 +776,21 @@ export default function BigScreenDashboard() {
               </div>
             </div>
 
+            <div className="flex items-center gap-3">
+              {serverMetricsData?.servers && serverMetricsData.servers.length > 0 && (
+                <select 
+                  value={selectedServerId}
+                  onChange={(e) => setSelectedServerId(e.target.value)}
+                  className="bg-slate-800/80 border border-slate-700/50 text-slate-300 text-sm rounded-lg px-3 py-2 outline-none focus:border-blue-500/50 transition-colors"
+                >
+                  <option value="all">所有服务器 (平均)</option>
+                  {serverMetricsData.servers.map(s => (
+                    <option key={s.server_id} value={s.server_id}>{s.server_name}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+            
             <div className="text-right">
               <div className="text-3xl font-bold text-white font-mono">
                 {currentTime.toLocaleTimeString('zh-CN', { hour12: false })}
@@ -855,18 +877,39 @@ export default function BigScreenDashboard() {
               </div>
             </div>
 
-            <div className="bg-slate-800/40 backdrop-blur-md rounded-2xl p-5 border border-slate-700/50 flex-1">
-              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <div className="bg-slate-800/40 backdrop-blur-md rounded-2xl p-5 border border-slate-700/50 flex-1 flex flex-col">
+              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2 flex-shrink-0">
                 <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
-                服务器负载
+                服务器硬盘监控
               </h2>
-              {serverMetrics.length > 0 ? (
-                <AnimatedBarChart data={serverMetrics} height={180} />
-              ) : (
-                <div className="flex items-center justify-center h-[180px] text-slate-500 text-sm">
-                  暂无已启用的服务器
-                </div>
-              )}
+              <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin" style={{ maxHeight: '180px' }}>
+                {serverMetrics.length > 0 ? (
+                  <div className="flex flex-col gap-3">
+                    {serverMetrics.map((item, idx) => (
+                      <div key={idx} className="flex flex-col gap-1">
+                        <div className="flex justify-between text-xs text-slate-300">
+                          <span className="truncate flex-1 pr-2" title={item.label}>{item.label}</span>
+                          <span>{item.value.toFixed(1)}%</span>
+                        </div>
+                        <div className="w-full bg-slate-700/50 rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-1000"
+                            style={{ 
+                                width: `${Math.min(item.value, 100)}%`,
+                              backgroundColor: item.color || '#8b5cf6',
+                                boxShadow: `0 0 10px ${item.color || '#8b5cf6'}80`
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-slate-500 text-sm">
+                    暂无已启用的服务器
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

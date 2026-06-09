@@ -53,8 +53,11 @@ const navigationGroups = [
   {
     name: '首页',
     icon: Home,
+
     items: [
+      { name: 'NOC智能助手', href: '#noc-assistant', icon: Bot, isAction: true },
       { name: '仪表盘', href: '/dashboard', icon: LayoutDashboard },
+
       { name: '监控大屏', href: '/big-screen', icon: Monitor },
     ]
   },
@@ -194,7 +197,7 @@ export default function Layout() {
             <div>
               <h1 className={clsx('text-base font-bold tracking-tight',
                 theme === 'dark' ? 'text-white' : 'text-gray-900'
-              )}>ITOps Agent</h1>
+              )}>NOC Agent Platform</h1>
               <p className={clsx('text-[11px]',
                 theme === 'dark' ? 'text-slate-400' : 'text-gray-500'
               )}>多Agent自动化平台</p>
@@ -225,25 +228,44 @@ export default function Layout() {
               
               {expandedGroups.has(group.name) && (
                 <div className="pl-2 space-y-0.5">
-                  {group.items.map((item) => (
-                    <NavLink
-                      key={item.name}
-                      to={item.href}
-                      className={({ isActive }) =>
-                        clsx(
-                          'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 group',
-                          isActive
-                            ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/25'
-                            : theme === 'dark'
+                  {group.items.map((item: any) => {
+                    if (item.isAction) {
+                      return (
+                        <button
+                          key={item.name}
+                          onClick={() => window.dispatchEvent(new CustomEvent('open-noc-assistant'))}
+                          className={clsx(
+                            'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 group',
+                            theme === 'dark'
                               ? 'text-slate-400 hover:bg-slate-800/80 hover:text-white'
                               : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                        )
-                      }
-                    >
-                      <item.icon className="w-4 h-4 group-hover:scale-110 transition-transform flex-shrink-0" />
-                      {item.name}
-                    </NavLink>
-                  ))}
+                          )}
+                        >
+                          <item.icon className="w-4 h-4 group-hover:scale-110 transition-transform flex-shrink-0" />
+                          {item.name}
+                        </button>
+                      );
+                    }
+                    return (
+                      <NavLink
+                        key={item.name}
+                        to={item.href}
+                        className={({ isActive }) =>
+                          clsx(
+                            'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 group',
+                            isActive
+                              ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/25'
+                              : theme === 'dark'
+                                ? 'text-slate-400 hover:bg-slate-800/80 hover:text-white'
+                                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                          )
+                        }
+                      >
+                        <item.icon className="w-4 h-4 group-hover:scale-110 transition-transform flex-shrink-0" />
+                        {item.name}
+                      </NavLink>
+                    );
+                  })}
                 </div>
               )}
             </div>

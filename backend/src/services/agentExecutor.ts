@@ -100,7 +100,7 @@ async function executeServerCommandAgent(input: string, context?: Record<string,
         report += `**状态**: ❌ 失败 (${result.duration}ms)\n\n`;
       }
       
-      report += `**输出**: \n\`\`\`\n${result.stdout?.substring(0, 500) || '(无输出)'}\n\`\`\`\n`;
+      report += `**输出**: \n\`\`\`\n${result.stdout?.substring(0, 5000) || '(无输出)'}\n\`\`\`\n`;
       
       if (result.stderr) {
         report += `**错误**: \n\`\`\`\n${result.stderr}\n\`\`\`\n`;

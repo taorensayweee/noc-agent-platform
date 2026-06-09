@@ -28,6 +28,12 @@ export default function ChatWidget() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+
+  useEffect(() => {
+    const handleOpen = () => setIsOpen(true);
+    window.addEventListener('open-noc-assistant', handleOpen);
+    return () => window.removeEventListener('open-noc-assistant', handleOpen);
+  }, []);
   const [inputValue, setInputValue] = useState('');
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
 
@@ -151,14 +157,7 @@ export default function ChatWidget() {
   };
 
   if (!isOpen) {
-    return (
-      <button
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 transition-all duration-300 flex items-center justify-center text-white hover:scale-[1.05] active:scale-[0.95] z-50"
-      >
-        <Bot className="w-7 h-7" />
-      </button>
-    );
+    return null;
   }
 
   const bgMain = 'bg-surface';
@@ -183,11 +182,11 @@ export default function ChatWidget() {
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
       {!isMinimized && (
-        <div className={`w-[420px] h-[600px] ${bgMain} rounded-2xl shadow-2xl border ${borderColor} flex flex-col mb-3 overflow-hidden animate-slide-up`}>
+        <div className={`w-[600px] h-[800px] resize overflow-auto min-w-[400px] min-h-[500px] ${bgMain} rounded-2xl shadow-2xl border ${borderColor} flex flex-col mb-3 overflow-hidden animate-slide-up`}>
           <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 flex-shrink-0">
             <div className="flex items-center gap-2">
               <Bot className="w-5 h-5 text-white" />
-              <h3 className="font-semibold text-white">IT运维助手</h3>
+              <h3 className="font-semibold text-white">NOC智能助手</h3>
             </div>
             <div className="flex items-center gap-1">
               <button
@@ -261,7 +260,7 @@ export default function ChatWidget() {
                     <div>
                       <p className="text-yellow-300 font-medium text-sm">需要修改密码</p>
                       <p className="text-yellow-200/80 text-xs mt-1">
-                        请先去设置页面修改初始密码，然后再使用IT运维助手
+                        请先去设置页面修改初始密码，然后再使用NOC智能助手
                       </p>
                     </div>
                   </div>

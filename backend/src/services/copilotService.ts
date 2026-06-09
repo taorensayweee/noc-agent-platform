@@ -1,3 +1,4 @@
+import { MultiAgentOrchestrator } from './multiAgentCollaboration';
 import db from '../models/database';
 import { logger } from '../utils/logger';
 import { callDoubaoAPI, callOpenAIAPI, callLocalAIAPI, checkLLMAvailability, generateCompletion } from './llmService';
@@ -299,33 +300,54 @@ class CopilotService {
 
   private async generateResponse(input: string, conversationHistory: CopilotMessage[]): Promise<string> {
     try {
-      logger.info(`🤖 [Copilot] 开始生成响应，输入长度: ${input.length}`);
+      logger.info(`🤖 [Copilot] 启用全新多智能体调度引擎处理请求`);
       
-      // 构建对话历史（最近 10 条）
+      // 构建基础上下文数据
+      const context = this.buildContextForLLM(input);
+      
+      // 获取所有数据库中激活的Agent作为专家池
+      const activeAgents = db.prepare('SELECT id, name, role, description FROM agents WHERE enabled = 1').all() as any[];
+      const agentIds = activeAgents.map(a => a.id);
+      
+      if (agentIds.length > 0 && input.length > 2) {
+         try {
+             // 实例化 Orchestrator 引擎并传递上下文
+             const orchestrator = new MultiAgentOrchestrator(randomUUID(), {
+                 systemContext: context,
+                 chatHistory: conversationHistory.slice(-5)
+             });
+             
+             // 开始委托多智能体协作
+             logger.info(`🤖 [Copilot] 触发 Orchestrator 协作...`);
+             const collaborationResult = await orchestrator.collaborate(
+                 input,
+                 agentIds,
+                 { enableRAG: false, maxRounds: 8 }
+             );
+             
+             // 提取最后一条 Assistant/Agent 回复
+             const finalMessage = collaborationResult.reverse().find((msg: any) => msg.role === 'assistant' || msg.role === 'system');
+             
+             if (finalMessage && finalMessage.content) {
+                 const prefix = finalMessage.name ? `【由 ${finalMessage.name} 提供】\n\n` : '';
+                 return prefix + finalMessage.content;
+             }
+         } catch(orchestratorError) {
+             logger.warn(`🤖 [Copilot] Orchestrator 协作异常，降级到通用 LLM:`, orchestratorError);
+         }
+      }
+
+      // 降级：如果没有任何Agent可用，或者Orchestrator抛错，退回到原本的通用聊天模式
       const recentMessages = conversationHistory.slice(-10);
       const historyText = recentMessages.map(m => `${m.role === 'user' ? '用户' : '助手'}: ${m.content}`).join('\n');
-
-      // 注入相关上下文数据
-      const context = this.buildContextForLLM(input);
-
-      const enrichedPrompt = context
-        ? `当前系统数据：\n${context}\n用户输入：${input}\n对话历史：\n${historyText}`
-        : `用户输入：${input}\n对话历史：\n${historyText}`;
-
-      // 优先使用 AI 模型池的默认模型（已在 generateCompletion 中实现）
-      logger.info(`🤖 [Copilot] 调用 generateCompletion 生成响应`);
+      const enrichedPrompt = context ? `当前系统数据：\n${context}\n用户输入：${input}\n对话历史：\n${historyText}` : `用户输入：${input}\n对话历史：\n${historyText}`;
+      
       const llmResponse = await generateCompletion(enrichedPrompt, COPILOT_SYSTEM_PROMPT, 0.7, undefined, 'copilot');
+      return llmResponse.length > 4000 ? llmResponse.substring(0, 4000) + '...\n\n（回复过长，已截断）' : llmResponse;
       
-      // 截断超长响应，防止前端渲染问题
-      const truncatedResponse = llmResponse.length > 4000 
-        ? llmResponse.substring(0, 4000) + '...\n\n（回复过长，已截断）' 
-        : llmResponse;
-      
-      logger.info(`🤖 [Copilot] 响应生成成功，长度: ${truncatedResponse.length}`);
-      return truncatedResponse;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.warn(`🤖 [Copilot] LLM 调用失败，回退到规则响应: ${errorMessage}`);
+      logger.warn(`🤖 [Copilot] LLM 调用全链路失败，回退到规则响应: ${errorMessage}`);
       return this.getRuleBasedResponse(input);
     }
   }

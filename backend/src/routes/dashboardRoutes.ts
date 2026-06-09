@@ -335,7 +335,7 @@ router.get('/sla-stats', (_req: Request, res: Response) => {
 
 router.get('/server-metrics', (_req: Request, res: Response) => {
   try {
-    const enabledServers = db.prepare('SELECT id, name, hostname FROM servers WHERE enabled = 1 ORDER BY name LIMIT 10').all() as Array<{ id: string; name: string; hostname: string }>;
+    const enabledServers = db.prepare('SELECT id, name, hostname FROM servers WHERE enabled = 1 ORDER BY name LIMIT 100').all() as Array<{ id: string; name: string; hostname: string }>;
 
     if (enabledServers.length === 0) {
       return res.json({

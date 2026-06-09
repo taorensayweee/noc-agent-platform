@@ -196,12 +196,10 @@ export default function Dashboard() {
             <p className="text-text-secondary">IT运维多Agent自动化平台概览</p>
           </div>
           <a
-            href="https://www.zjzwfw.cloud/"
             target="_blank"
             rel="noopener noreferrer"
             className="px-4 py-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors font-medium text-sm"
           >
-            访问官网
           </a>
         </div>
 

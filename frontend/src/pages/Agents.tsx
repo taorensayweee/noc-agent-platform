@@ -401,7 +401,7 @@ export default function Agents() {
                     >
                       <Edit className="w-4.5 h-4.5" />
                     </button>
-                    {agent.is_preset !== 1 && (
+                    {true && (
                       <button
                         onClick={() => handleDelete(agent.id, agent.name)}
                         className="p-2.5 hover:bg-red-500/20 text-red-400 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]"
@@ -753,7 +753,7 @@ function AgentDetailInner({ agentId, onBack, deleteMutation }: AgentDetailInnerP
               <Edit className="w-4 h-4" />
               编辑 Agent
             </button>
-            {agent.is_preset !== 1 && (
+            {true && (
               <button
                 onClick={() => {
                   if (confirm(`确定要删除Agent "${agent.name}" 吗？`)) {

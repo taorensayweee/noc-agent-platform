@@ -67,21 +67,24 @@ router.post('/', requireRole('admin'), async (req: Request, res: Response) => {
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
     
-    db.prepare(`
-      INSERT INTO users (id, username, password, email, role, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(id, username, hashedPassword, email || null, role, now, now);
+    const result = db.prepare(`
+      INSERT INTO users (username, password, email, role, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(username, hashedPassword, email || null, role, now, now);
+    
+    // Replace the UUID string with the actual auto-incremented integer ID
+    const newId = result.lastInsertRowid.toString();
     
     const reqUser = (req as { user?: { id: string } }).user;
     createAuditLog({
       user_id: reqUser?.id || 'system',
       action: 'create_user',
       resource_type: 'user',
-      resource_id: id,
+      resource_id: newId,
       details: { username, email, role }
     });
     
-    res.status(201).json({ success: true, data: { id, username, email, role } });
+    res.status(201).json({ success: true, data: { id: newId, username, email, role } });
   } catch (error) {
     res.status(500).json({ success: false, error: (error as Error).message });
   }
