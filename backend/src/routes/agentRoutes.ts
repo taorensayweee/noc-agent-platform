@@ -193,7 +193,7 @@ const PRESET_TEST_INPUTS: Record<string, string> = {
 // 测试Agent执行
 router.post('/:id/test', async (req: Request, res: Response) => {
   try {
-    const { input, serverId, serverIds, context } = req.body;
+    const { input, serverId, serverIds, context, databaseId } = req.body;
     const agent = db.prepare('SELECT * FROM agents WHERE id = ?').get(req.params.id);
     
     if (!agent) {
@@ -208,15 +208,16 @@ router.post('/:id/test', async (req: Request, res: Response) => {
     let status = 'success';
     let errorMessage = null;
     
-    // 构建上下文 - 优先使用serverIds，如果没有则使用serverId
-    const executionContext = {
+    // 构建上下文
+    const executionContext: Record<string, unknown> = {
       ...context,
-      serverIds: serverIds && serverIds.length > 0 ? serverIds : (serverId ? [serverId] : undefined)
+      serverIds: serverIds && serverIds.length > 0 ? serverIds : (serverId ? [serverId] : undefined),
+      databaseId: databaseId || undefined
     };
     
     try {
-      // 检查是否是服务器相关的Agent，如果是，就用增强的执行器
-      if (agentName.includes('服务器') || agentName.includes('巡检')) {
+      // 检查是否是服务器相关Agent或数据库运维Agent，如果是，就用增强的执行器
+      if (agentName.includes('服务器') || agentName.includes('巡检') || agentName.includes('数据库运维')) {
         output = await executeAgentNode((agent as { id: string }).id, input, executionContext);
       } else {
         // 其他Agent用LLM执行
@@ -243,7 +244,7 @@ router.post('/:id/test', async (req: Request, res: Response) => {
       status,
       errorMessage,
       executionTime,
-      JSON.stringify({ test: true, context: executionContext, serverId, serverIds })
+      JSON.stringify({ test: true, context: executionContext, serverId, serverIds, databaseId })
     );
     
     // 更新Agent使用统计
@@ -263,7 +264,8 @@ router.post('/:id/test', async (req: Request, res: Response) => {
         status,
         executionTime,
         metadata: {
-          serverId
+          serverId,
+          databaseId
         }
       }
     });

@@ -23,7 +23,7 @@ export default function WebTerminal({ serverId, serverName, token, onClose }: Te
   const terminalDataHandlerRef = useRef<((data: { sessionId: string; data: string }) => void) | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectCountRef = useRef(0);
-  const maxReconnectAttempts = 3;
+  const maxReconnectAttempts = 10;
   const mountedRef = useRef(true);
   const [status, setStatus] = useState<'connecting' | 'connected' | 'error' | 'disconnected'>('connecting');
   const [error, setError] = useState<string>('');
@@ -76,8 +76,17 @@ export default function WebTerminal({ serverId, serverName, token, onClose }: Te
 
     const socket = io(undefined, {
       auth: { token },
-      transports: ['websocket']
+      transports: ['websocket'],
+      reconnectionAttempts: 20,
+      timeout: 60000
     });
+
+    // Setup an explicit heartbeat ping to prevent Nginx/Socket.io from dropping idle connections
+    const pingInterval = setInterval(() => {
+      if (socket.connected) {
+        socket.emit('terminal:ping', { timestamp: Date.now() });
+      }
+    }, 15000);
     socketRef.current = socket;
 
     const terminalDataHandler = (data: { sessionId: string; data: string }) => {
@@ -151,6 +160,7 @@ export default function WebTerminal({ serverId, serverName, token, onClose }: Te
         clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
       }
+      clearInterval(pingInterval);
       reconnectCountRef.current = 0;
 
       onDataDisposeRef.current?.dispose();

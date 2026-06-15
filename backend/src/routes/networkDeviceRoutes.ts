@@ -34,12 +34,20 @@ router.get('/:id', (req: Request, res: Response) => {
 // Create device
 router.post('/', (req: Request, res: Response) => {
   try {
-    const { name, ip_address, vendor, model, os_version, ssh_port, username, password, enable_password, location, role } = req.body;
+    const { name, ip_address, vendor, model, os_version, ssh_port, ssh_key_id, username, password, enable_password, location, role } = req.body;
 
-    if (!name || !ip_address || !vendor || !username || !password) {
+    if (!name || !ip_address || !vendor) {
       return res.status(400).json({ 
         success: false, 
-        error: 'Missing required fields: name, ip_address, vendor, username, password' 
+        error: 'Missing required fields: name, ip_address, vendor' 
+      });
+    }
+
+    // 如果没有选择凭证，则必须提供用户名和密码
+    if (!ssh_key_id && (!username || !password)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '请选择认证凭证或手动输入用户名和密码' 
       });
     }
 
@@ -50,6 +58,7 @@ router.post('/', (req: Request, res: Response) => {
       model,
       os_version,
       ssh_port,
+      ssh_key_id,
       username,
       password,
       enable_password,
@@ -64,7 +73,7 @@ router.post('/', (req: Request, res: Response) => {
     if (message.includes('UNIQUE constraint')) {
       return res.status(409).json({ success: false, error: 'IP address already exists' });
     }
-    res.status(500).json({ success: false, error: 'Failed to create device' });
+    res.status(500).json({ success: false, error: message || 'Failed to create device' });
   }
 });
 

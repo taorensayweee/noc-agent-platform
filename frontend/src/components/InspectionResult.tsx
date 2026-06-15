@@ -1,4 +1,5 @@
 import { X, CheckCircle2, AlertCircle, AlertTriangle, Loader2, Clock } from 'lucide-react';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface InspectionResultProps {
   result: {
@@ -91,6 +92,8 @@ function formatDuration(ms: number) {
 }
 
 export default function InspectionResult({ result, deviceName, onClose }: InspectionResultProps) {
+  useEscapeKey({ onEscape: onClose });
+
   const normalCount = result.results.filter(r => r.status === 'normal').length;
   const warningCount = result.results.filter(r => r.status === 'warning').length;
   const criticalCount = result.results.filter(r => r.status === 'critical').length;

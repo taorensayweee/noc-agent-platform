@@ -46,10 +46,13 @@ const roleIcons: Record<string, { icon: string; label: string }> = {
 export default function NetworkDeviceCard({ device, onEdit, onDelete, onInspect, onTestConnection, onHistory }: NetworkDeviceCardProps) {
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node) &&
+          buttonRef.current && !buttonRef.current.contains(event.target as Node)) {
         setShowMenu(false);
       }
     };
@@ -59,6 +62,14 @@ export default function NetworkDeviceCard({ device, onEdit, onDelete, onInspect,
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showMenu]);
+
+  const handleToggleMenu = () => {
+    if (!showMenu && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setMenuPos({ top: rect.bottom + 4, left: rect.right - 160 });
+    }
+    setShowMenu(!showMenu);
+  };
 
   const vendor = vendorConfig[device.vendor] || { label: device.vendor, color: 'text-text-secondary', bgClass: 'bg-surface border border-border', icon: '⚪' };
   const role = roleIcons[device.role || ''] || { icon: '📦', label: device.role || '设备' };
@@ -92,15 +103,20 @@ export default function NetworkDeviceCard({ device, onEdit, onDelete, onInspect,
               <p className="text-xs text-text-secondary font-mono">{device.ip_address}</p>
             </div>
           </div>
-          <div className="relative" ref={menuRef}>
+          <div className="relative">
             <button
-              onClick={() => setShowMenu(!showMenu)}
+              ref={buttonRef}
+              onClick={handleToggleMenu}
               className="p-1 text-text-secondary hover:text-text-primary hover:bg-surface rounded-md transition-colors"
             >
               <MoreHorizontal className="w-4 h-4" />
             </button>
             {showMenu && (
-              <div className="absolute right-0 top-8 w-40 bg-surface rounded-lg shadow-xl border border-border py-1 z-10">
+              <div
+                ref={menuRef}
+                className="fixed w-40 bg-surface rounded-lg shadow-xl border border-border py-1 z-50"
+                style={{ top: menuPos.top, left: menuPos.left }}
+              >
                 <button
                   onClick={() => { setShowMenu(false); onInspect(device, 'standard'); }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-xs text-text-secondary hover:text-text-primary hover:bg-background transition-colors"

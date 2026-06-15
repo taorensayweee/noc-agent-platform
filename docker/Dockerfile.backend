@@ -50,11 +50,17 @@ ENV NODE_ENV=production \
     PORT=3001 \
     HOST=0.0.0.0
 
-# Install runtime dependencies (SQLite library for better-sqlite3) and gosu for privilege dropping
+# Install runtime dependencies (SQLite library, Python for dbskiter, gosu for privilege dropping)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libsqlite3-0 \
+    python3 \
+    python3-pip python3-venv \
     gosu \
     && rm -rf /var/lib/apt/lists/*
+
+# 安装 dbskiter（数据库运维 Agent 依赖），构建时失败不阻塞镜像构建
+RUN python3 -m venv /opt/venv && /opt/venv/bin/pip install --upgrade pip
+RUN /opt/venv/bin/pip install 'numpy<2' 'pandas<2.2.0' && /opt/venv/bin/pip install dbskiter
 
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist

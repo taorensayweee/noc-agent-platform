@@ -11,6 +11,7 @@ import AddDeviceModal from '../components/AddDeviceModal';
 import NetworkDeviceCard from '../components/NetworkDeviceCard';
 import InspectionResult from '../components/InspectionResult';
 import InspectionHistory from '../components/InspectionHistory';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface NetworkDevice {
   id: string;
@@ -49,13 +50,20 @@ export default function NetworkDevices() {
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [deleteConfirmDevice, setDeleteConfirmDevice] = useState<NetworkDevice | null>(null);
 
+  // ESC key support for modals
+  useEscapeKey({ onEscape: () => { setShowInspectionModal(false); setInspectingDevice(null); }, enabled: showInspectionModal });
+  useEscapeKey({ onEscape: () => setShowBatchModal(false), enabled: showBatchModal });
+  useEscapeKey({ onEscape: () => { setDeleteConfirmDevice(null); }, enabled: !!deleteConfirmDevice });
+  useEscapeKey({ onEscape: () => { setInspectionResult(null); setInspectingDevice(null); }, enabled: !!inspectionResult });
+  useEscapeKey({ onEscape: () => setShowHistory(null), enabled: !!showHistory });
+
   const { data: devices = [], isLoading } = useQuery({
     queryKey: ['network-devices'],
-    queryFn: () => api.get('/network-devices').then(res => res.data.data)
+    queryFn: () => api.get('/api/network-devices').then(res => res.data.data)
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/network-devices/${id}`),
+    mutationFn: (id: string) => api.delete(`/api/network-devices/${id}`),
     onSuccess: () => {
       toast.success('设备删除成功');
       queryClient.invalidateQueries({ queryKey: ['network-devices'] });
@@ -89,7 +97,7 @@ export default function NetworkDevices() {
   const handleTestConnection = async (device: NetworkDevice) => {
     try {
       toast.info(`正在测试 ${device.name} 的连接...`);
-      const response = await api.post(`/network-devices/${device.id}/test-connection`);
+      const response = await api.post(`/api/network-devices/${device.id}/test-connection`);
       const result = response.data;
       
       if (result.success) {
@@ -111,7 +119,7 @@ export default function NetworkDevices() {
 
     setIsInspecting(true);
     try {
-      const response = await api.post(`/network-devices/${inspectingDevice.id}/inspect`, {
+      const response = await api.post(`/api/network-devices/${inspectingDevice.id}/inspect`, {
         inspectionType,
         customDescription: inspectionType === 'custom' ? customDescription : undefined
       });
@@ -157,7 +165,7 @@ export default function NetworkDevices() {
 
     setIsBatchInspecting(true);
     try {
-      const response = await api.post('/network-devices/batch-inspect', {
+      const response = await api.post('/api/network-devices/batch-inspect', {
         deviceIds: Array.from(selectedDevices),
         inspectionType: 'standard'
       });

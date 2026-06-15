@@ -39,6 +39,7 @@ import RCADetail from './pages/RCADetail';
 import RemediationWorkbench from './pages/RemediationWorkbench';
 import AIInsights from './pages/AIInsights';
 import NetworkDevices from './pages/NetworkDevices';
+import DbConnections from './pages/DbConnections';
 import SSHKeys from './pages/SSHKeys';
 import AIModels from './pages/AIModels';
 import NotFound from './pages/NotFound';
@@ -69,6 +70,7 @@ function App() {
               <Route path="servers" element={<ProtectedRoute><Servers /></ProtectedRoute>} />
               <Route path="ssh-keys" element={<ProtectedRoute><SSHKeys /></ProtectedRoute>} />
               <Route path="network-devices" element={<ProtectedRoute><NetworkDevices /></ProtectedRoute>} />
+              <Route path="db-connections" element={<ProtectedRoute><DbConnections /></ProtectedRoute>} />
               <Route path="agents" element={<ProtectedRoute><Agents /></ProtectedRoute>} />
               <Route path="workflows" element={<ProtectedRoute><Workflows /></ProtectedRoute>} />
               <Route path="workflows/:id" element={<ProtectedRoute><WorkflowEditor /></ProtectedRoute>} />

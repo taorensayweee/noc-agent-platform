@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Plus, Edit, Trash2, Play, Clock, Search, 
-  ChevronLeft, BookOpen, Server
+  ChevronLeft, BookOpen, Server, Database
 } from 'lucide-react';
 import clsx from 'clsx';
 import api from '../lib/api';
@@ -46,6 +46,18 @@ interface Server {
   enabled: number;
 }
 
+interface DbConnection {
+  id: string;
+  name: string;
+  db_type: string;
+  host: string;
+  port: number;
+  username: string;
+  database: string;
+  description?: string;
+  enabled: number;
+}
+
 interface AgentExecution {
   id: string;
   agent_id: string;
@@ -71,6 +83,7 @@ export default function Agents() {
   const [testResult, setTestResult] = useState<{output: string, time: number} | null>(null);
   const [isTesting, setIsTesting] = useState(false);
   const [selectedServerIds, setSelectedServerIds] = useState<string[]>([]);
+  const [selectedDatabaseId, setSelectedDatabaseId] = useState<string>('');
 
   const { data: agents, isLoading } = useQuery({
     queryKey: ['agents', selectedCategory, searchQuery],
@@ -91,6 +104,14 @@ export default function Agents() {
     },
   });
 
+  const { data: dbConnections } = useQuery({
+    queryKey: ['db-connections'],
+    queryFn: async () => {
+      const res = await api.get('/api/db-connections');
+      return res.data.data as DbConnection[];
+    },
+  });
+
   // Get unique categories from agents
   const categories = Array.from(new Set((agents || []).map(a => a.category).filter(Boolean) as string[]));
 
@@ -104,8 +125,11 @@ export default function Agents() {
   });
 
   const testMutation = useMutation({
-    mutationFn: async ({ agentId, input, serverIds }: { agentId: string, input: string, serverIds?: string[] }) => {
-      const res = await api.post(`/api/agents/${agentId}/test`, { input, serverIds });
+    mutationFn: async ({ agentId, input, serverIds, databaseId }: { agentId: string, input: string, serverIds?: string[], databaseId?: string }) => {
+      const payload: Record<string, unknown> = { input };
+      if (serverIds && serverIds.length > 0) payload.serverIds = serverIds;
+      if (databaseId) payload.databaseId = databaseId;
+      const res = await api.post(`/api/agents/${agentId}/test`, payload);
       return res.data.data;
     },
   });
@@ -131,9 +155,22 @@ export default function Agents() {
     setTestResult(null);
     setShowTestModal(true);
     
-    // 默认选择所有服务器
-    if (servers && servers.length > 0 && selectedServerIds.length === 0) {
-      setSelectedServerIds(servers.filter((s) => s.enabled).map((s) => s.id));
+    const isDbAgent = agent.name.includes('数据库运维');
+    
+    if (isDbAgent) {
+      // 数据库运维Agent：清空服务器选择，默认选中第一个可用的数据库
+      setSelectedServerIds([]);
+      const firstEnabled = dbConnections?.find((d) => d.enabled);
+      if (firstEnabled) {
+        setSelectedDatabaseId(firstEnabled.id);
+      } else {
+        setSelectedDatabaseId('');
+      }
+    } else {
+      // 其他Agent：默认选择所有服务器
+      if (servers && servers.length > 0 && selectedServerIds.length === 0) {
+        setSelectedServerIds(servers.filter((s) => s.enabled).map((s) => s.id));
+      }
     }
     
     // 根据 Agent 名字自动填入预设的测试输入
@@ -155,7 +192,9 @@ export default function Agents() {
       '服务器命令执行 Agent': '请检查服务器磁盘使用情况',
       '服务器命令执行': '请检查服务器磁盘使用情况',
       '自动巡检 Agent': '请对所有服务器执行批量巡检',
-      '自动巡检': '请对所有服务器执行批量巡检'
+      '自动巡检': '请对所有服务器执行批量巡检',
+      '数据库运维 Agent': '检查数据库健康状态',
+      '数据库运维': '检查数据库健康状态'
     };
     
     const defaultInput = presetInputs[agent.name] || '请描述您要处理的运维问题';
@@ -165,11 +204,15 @@ export default function Agents() {
   const runTest = () => {
     if (!editingAgent || !testInput) return;
     setIsTesting(true);
+    
+    const isDbAgent = editingAgent.name.includes('数据库运维');
+    
     testMutation.mutate(
       { 
         agentId: editingAgent.id, 
         input: testInput,
-        serverIds: selectedServerIds.length > 0 ? selectedServerIds : undefined
+        serverIds: isDbAgent ? undefined : (selectedServerIds.length > 0 ? selectedServerIds : undefined),
+        databaseId: isDbAgent ? selectedDatabaseId : undefined
       },
       {
         onSuccess: (data) => {
@@ -449,42 +492,79 @@ export default function Agents() {
             
             {/* 内容区域 - 可滚动 */}
             <div className="p-6 overflow-y-auto flex-1 space-y-4">
-              {/* 服务器选择 */}
+              {/* 数据库/服务器选择 */}
               <div className="pt-3 border-t border-slate-700/30">
-                <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
-                  <Server className="w-4 h-4" />
-                  选择服务器
-                </label>
-                {servers && servers.length > 0 ? (
-                  <div className="space-y-2">
-                    {servers.filter((s) => s.enabled).map((server) => (
-                      <label key={server.id} className="flex items-center gap-3 p-3 bg-slate-900/50 border border-slate-700/50 rounded-xl hover:bg-slate-800/50 transition-all cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={selectedServerIds.includes(server.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedServerIds([...selectedServerIds, server.id]);
-                            } else {
-                              setSelectedServerIds(selectedServerIds.filter((id) => id !== server.id));
-                            }
-                          }}
-                          className="w-4 h-4 rounded border-slate-600 text-blue-500 focus:ring-blue-500/50"
-                        />
-                        <div className="flex-1">
-                          <div className="text-sm font-medium text-white">{server.name}</div>
-                          <div className="text-xs text-slate-500">{server.hostname}:{server.port}</div>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
+                {editingAgent.name.includes('数据库运维') ? (
+                  <>
+                    <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
+                      <Database className="w-4 h-4" />
+                      选择数据库
+                    </label>
+                    {dbConnections && dbConnections.length > 0 ? (
+                      <div className="space-y-2">
+                        {dbConnections.filter((d) => d.enabled).map((conn) => (
+                          <label key={conn.id} className="flex items-center gap-3 p-3 bg-slate-900/50 border border-slate-700/50 rounded-xl hover:bg-slate-800/50 transition-all cursor-pointer">
+                            <input
+                              type="radio"
+                              name="databaseId"
+                              checked={selectedDatabaseId === conn.id}
+                              onChange={() => setSelectedDatabaseId(conn.id)}
+                              className="w-4 h-4 rounded-full border-slate-600 text-blue-500 focus:ring-blue-500/50"
+                            />
+                            <div className="flex-1">
+                              <div className="text-sm font-medium text-white">{conn.name}</div>
+                              <div className="text-xs text-slate-500">{conn.db_type}://{conn.host}:{conn.port}/{conn.database}</div>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-400">暂无数据库连接。请先在数据库连接管理中添加。</p>
+                    )}
+                    {selectedDatabaseId && dbConnections && (
+                      <p className="mt-2 text-xs text-slate-500">
+                        已选择: {dbConnections.find((d) => d.id === selectedDatabaseId)?.name}
+                      </p>
+                    )}
+                  </>
                 ) : (
-                  <p className="text-sm text-slate-400">暂无可用的服务器</p>
-                )}
-                {selectedServerIds.length > 0 && servers && (
-                  <p className="mt-2 text-xs text-slate-500">
-                    已选择 {selectedServerIds.length} 台服务器: {selectedServerIds.map((id) => servers.find((s) => s.id === id)?.name).join(', ')}
-                  </p>
+                  <>
+                    <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
+                      <Server className="w-4 h-4" />
+                      选择服务器
+                    </label>
+                    {servers && servers.length > 0 ? (
+                      <div className="space-y-2">
+                        {servers.filter((s) => s.enabled).map((server) => (
+                          <label key={server.id} className="flex items-center gap-3 p-3 bg-slate-900/50 border border-slate-700/50 rounded-xl hover:bg-slate-800/50 transition-all cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedServerIds.includes(server.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedServerIds([...selectedServerIds, server.id]);
+                                } else {
+                                  setSelectedServerIds(selectedServerIds.filter((id) => id !== server.id));
+                                }
+                              }}
+                              className="w-4 h-4 rounded border-slate-600 text-blue-500 focus:ring-blue-500/50"
+                            />
+                            <div className="flex-1">
+                              <div className="text-sm font-medium text-white">{server.name}</div>
+                              <div className="text-xs text-slate-500">{server.hostname}:{server.port}</div>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-400">暂无可用的服务器</p>
+                    )}
+                    {selectedServerIds.length > 0 && servers && (
+                      <p className="mt-2 text-xs text-slate-500">
+                        已选择 {selectedServerIds.length} 台服务器: {selectedServerIds.map((id) => servers.find((s) => s.id === id)?.name).join(', ')}
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -502,7 +582,7 @@ export default function Agents() {
 
               <button
                 onClick={runTest}
-                disabled={!testInput || isTesting}
+                disabled={!testInput || isTesting || (editingAgent?.name.includes('数据库运维') && !selectedDatabaseId)}
                 className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-500 hover:to-blue-600 hover:shadow-lg hover:shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2 font-semibold"
               >
                 {isTesting ? (

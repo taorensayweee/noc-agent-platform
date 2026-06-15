@@ -62,9 +62,9 @@ interface ServerInfo {
 }
 
 export class TerminalService {
-  private static readonly CONNECT_TIMEOUT = 15000;
-  private static readonly KEEPALIVE_INTERVAL = 10000;
-  private static readonly KEEPALIVE_MAX = 3;
+  private static readonly CONNECT_TIMEOUT = 60000;
+  private static readonly KEEPALIVE_INTERVAL = 10000;  // Send keepalive every 10 seconds
+  private static readonly KEEPALIVE_MAX = 360;         // Allow missing up to 360 keepalives (1 hour) before dropping
 
   async createTerminalSession(
     serverId: string,

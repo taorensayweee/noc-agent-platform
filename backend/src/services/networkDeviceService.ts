@@ -13,6 +13,7 @@ export interface NetworkDevice {
   model?: string;
   os_version?: string;
   ssh_port: number;
+  ssh_key_id?: string;
   username: string;
   password: string;
   enable_password?: string;
@@ -32,8 +33,9 @@ export interface CreateDeviceRequest {
   model?: string;
   os_version?: string;
   ssh_port?: number;
-  username: string;
-  password: string;
+  ssh_key_id?: string;
+  username?: string;
+  password?: string;
   enable_password?: string;
   location?: string;
   role?: string;
@@ -44,6 +46,7 @@ export interface UpdateDeviceRequest {
   model?: string;
   os_version?: string;
   ssh_port?: number;
+  ssh_key_id?: string;
   username?: string;
   password?: string;
   enable_password?: string;
@@ -70,13 +73,32 @@ class NetworkDeviceService {
 
   createDevice(data: CreateDeviceRequest): NetworkDevice {
     const id = randomUUID();
-    const encryptedPassword = encrypt(data.password);
+    
+    // 如果选择了凭证，从凭证表获取认证信息
+    let finalUsername = data.username || '';
+    let finalPassword = data.password || '';
+    
+    if (data.ssh_key_id) {
+      const credential = db.prepare(
+        'SELECT auth_type, username, password, private_key FROM ssh_keys WHERE id = ?'
+      ).get(data.ssh_key_id) as { auth_type: string; username: string; password: string; private_key: string } | undefined;
+      
+      if (credential) {
+        if (credential.auth_type === 'password') {
+          finalUsername = credential.username || '';
+          finalPassword = credential.password ? decrypt(credential.password) : '';
+        }
+        // 如果是密钥类型，暂时不支持（网络设备通常使用密码）
+      }
+    }
+    
+    const encryptedPassword = encrypt(finalPassword || data.password || '');
     const encryptedEnablePassword = data.enable_password ? encrypt(data.enable_password) : null;
 
     db.prepare(
       `INSERT INTO network_devices 
-      (id, name, ip_address, vendor, model, os_version, ssh_port, username, password, enable_password, location, role, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      (id, name, ip_address, vendor, model, os_version, ssh_port, ssh_key_id, username, password, enable_password, location, role, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       id,
       data.name,
@@ -85,7 +107,8 @@ class NetworkDeviceService {
       data.model || null,
       data.os_version || null,
       data.ssh_port || 22,
-      data.username,
+      data.ssh_key_id || null,
+      finalUsername || data.username || '',
       encryptedPassword,
       encryptedEnablePassword,
       data.location || null,
@@ -113,11 +136,24 @@ class NetworkDeviceService {
     if (data.model !== undefined) updates.push({ column: 'model', value: data.model });
     if (data.os_version !== undefined) updates.push({ column: 'os_version', value: data.os_version });
     if (data.ssh_port !== undefined) updates.push({ column: 'ssh_port', value: data.ssh_port });
+    if (data.ssh_key_id !== undefined) updates.push({ column: 'ssh_key_id', value: data.ssh_key_id || null });
     if (data.username !== undefined) updates.push({ column: 'username', value: data.username });
     if (data.password !== undefined) updates.push({ column: 'password', value: encrypt(data.password) });
     if (data.enable_password !== undefined) updates.push({ column: 'enable_password', value: data.enable_password ? encrypt(data.enable_password) : null });
     if (data.location !== undefined) updates.push({ column: 'location', value: data.location });
     if (data.role !== undefined) updates.push({ column: 'role', value: data.role });
+
+    // 如果切换了凭证，更新认证信息
+    if (data.ssh_key_id !== undefined && data.ssh_key_id) {
+      const credential = db.prepare(
+        'SELECT auth_type, username, password FROM ssh_keys WHERE id = ?'
+      ).get(data.ssh_key_id) as { auth_type: string; username: string; password: string } | undefined;
+      
+      if (credential && credential.auth_type === 'password') {
+        updates.push({ column: 'username', value: credential.username || '' });
+        updates.push({ column: 'password', value: encrypt(credential.password ? decrypt(credential.password) : '') });
+      }
+    }
 
     if (updates.length > 0) {
       const setClause = updates.map(u => `${u.column} = ?`).join(', ');

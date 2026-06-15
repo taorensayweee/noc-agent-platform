@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { X, History, Loader2, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react';
 import api from '../lib/api';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface InspectionHistoryProps {
   deviceId: string;
@@ -54,6 +55,8 @@ function formatDuration(ms: number) {
 
 export default function InspectionHistory({ deviceId, deviceName, onClose }: InspectionHistoryProps) {
   const [selectedHistory, setSelectedHistory] = useState<HistoryItem | null>(null);
+
+  useEscapeKey({ onEscape: () => { if (selectedHistory) setSelectedHistory(null); else onClose(); } });
 
   const { data: history = [], isLoading } = useQuery({
     queryKey: ['inspection-history', deviceId],

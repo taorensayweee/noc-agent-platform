@@ -125,6 +125,11 @@ export function setupWebSocket(io: SocketIOServer) {
       terminalService.closeTerminalSession(data.sessionId);
     });
 
+    // Handle manual ping to keep connection alive
+    socket.on('terminal:ping', () => {
+      // Just acknowledge quietly
+    });
+
     socket.on('disconnect', () => {
       logger.info(`❌ Client disconnected: ${socket.id}`);
       taskRooms.forEach((sockets, taskId) => {

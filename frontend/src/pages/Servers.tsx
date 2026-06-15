@@ -13,6 +13,7 @@ import clsx from 'clsx';
 import api from '../lib/api';
 import { useToast } from '../contexts/ToastContext';
 import { ImportExport } from '../components/ImportExport';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface Server {
   id: string;
@@ -125,6 +126,13 @@ export default function Servers() {
   const [showAiCommandConfirm, setShowAiCommandConfirm] = useState(false);
   const [aiGenerationError, setAiGenerationError] = useState('');
 
+  // ESC key support for modals
+  useEscapeKey({ onEscape: () => { setIsModalOpen(false); setSelectedServer(null); resetForm(); }, enabled: isModalOpen });
+  useEscapeKey({ onEscape: () => setIsImportModalOpen(false), enabled: isImportModalOpen });
+  useEscapeKey({ onEscape: () => { setIsGroupModalOpen(false); setEditingGroup(null); }, enabled: isGroupModalOpen });
+  useEscapeKey({ onEscape: () => { setIsAiCommandModalOpen(false); setAiPrompt(''); setAiGeneratedCommand(''); setAiCommandExplanation(''); setAiGenerationError(''); setShowAiCommandConfirm(false); }, enabled: isAiCommandModalOpen });
+  useEscapeKey({ onEscape: () => { setIsDeleteConfirmOpen(false); setPendingDeleteServer(null); }, enabled: isDeleteConfirmOpen });
+
   // 获取 Agent 列表（用于 AI 生成命令）
   const { data: agents } = useQuery({
     queryKey: ['agents'],
@@ -134,7 +142,7 @@ export default function Servers() {
     },
     enabled: true
   });
-  // SSH 密钥列表（用于选择已有密钥）
+  // 认证凭证列表（用于选择已有凭证）
   const { data: sshKeys } = useQuery({
     queryKey: ['ssh-keys'],
     queryFn: async () => {
@@ -222,7 +230,7 @@ export default function Servers() {
       .flatMap((server: Server) => Array.isArray(server.tags) ? server.tags : [])
   )).sort();
 
-  // 过滤 SSH 密钥列表（按名称、类型或指纹搜索）
+  // 过滤认证凭证列表（按名称、类型或指纹搜索）
   const filteredSshKeys = useMemo(() => {
     if (!sshKeys) return [];
     if (!sshKeySearchQuery) return sshKeys;
@@ -479,7 +487,7 @@ export default function Servers() {
     const serverSshKeyId = (server as any).ssh_key_id || '';
     setSelectedSshKeyId(serverSshKeyId);
     
-    // 如果有 SSH 密钥 ID，设置搜索框显示名称
+    // 如果有认证凭证 ID，设置搜索框显示名称
     if (serverSshKeyId && sshKeys) {
       const key = sshKeys.find(k => k.id === serverSshKeyId);
       if (key) {
@@ -1735,7 +1743,7 @@ ${serverInfo.disk_gb ? `磁盘大小：${serverInfo.disk_gb}GB` : ''}
                     onChange={(e) => setFormData({ ...formData, use_ssh_key: e.target.checked })}
                     className="rounded border-border"
                   />
-                  <label htmlFor="use_ssh_key" className="text-sm text-text-secondary">使用 SSH 密钥</label>
+                  <label htmlFor="use_ssh_key" className="text-sm text-text-secondary">使用认证凭证</label>
                 </div>
 
                 {!formData.use_ssh_key ? (
@@ -1848,7 +1856,7 @@ ${serverInfo.disk_gb ? `磁盘大小：${serverInfo.disk_gb}GB` : ''}
                             onClick={() => { resetForm(); setIsModalOpen(false); navigate('/ssh-keys'); }}
                             className="text-xs text-primary hover:underline"
                           >
-                            + 管理 SSH 密钥
+                            + 管理认证凭证
                           </button>
                         </div>
                       </div>

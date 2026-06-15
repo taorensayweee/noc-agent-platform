@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { X, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { X, CheckCircle2, AlertCircle, Loader2, Key, Lock, User } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
 import { useToast } from '../contexts/ToastContext';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface NetworkDevice {
   id?: string;
@@ -11,11 +13,21 @@ interface NetworkDevice {
   model?: string;
   os_version?: string;
   ssh_port?: number;
+  ssh_key_id?: string;
   username: string;
   password?: string;
   enable_password?: string;
   location?: string;
   role?: string;
+}
+
+interface Credential {
+  id: string;
+  name: string;
+  auth_type: 'key' | 'password';
+  key_type: string;
+  username: string | null;
+  description: string | null;
 }
 
 interface AddDeviceModalProps {
@@ -46,6 +58,9 @@ export default function AddDeviceModal({ device, onClose, onSuccess }: AddDevice
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [useCredential, setUseCredential] = useState(!!device?.ssh_key_id);
+
+  useEscapeKey({ onEscape: onClose, enabled: !isSubmitting });
   
   const [formData, setFormData] = useState({
     name: device?.name || '',
@@ -54,6 +69,7 @@ export default function AddDeviceModal({ device, onClose, onSuccess }: AddDevice
     model: device?.model || '',
     os_version: device?.os_version || '',
     ssh_port: device?.ssh_port || 22,
+    ssh_key_id: device?.ssh_key_id || '',
     username: device?.username || '',
     password: '',
     enable_password: '',
@@ -61,34 +77,94 @@ export default function AddDeviceModal({ device, onClose, onSuccess }: AddDevice
     role: device?.role || 'switch'
   });
 
+  // 获取认证凭证列表
+  const { data: credentials = [] } = useQuery({
+    queryKey: ['ssh-keys'],
+    queryFn: () => api.get('/ssh-keys').then(res => res.data.data)
+  });
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name || !formData.ip_address || !formData.username || (!isEditing && !formData.password)) {
-      toast.error('请填写必填字段');
+    if (!formData.name || !formData.ip_address) {
+      toast.error('请填写设备名称和 IP 地址');
+      return;
+    }
+
+    // 如果使用凭证，则不需要手动输入用户名密码
+    if (!useCredential && (!formData.username || (!isEditing && !formData.password))) {
+      toast.error('请选择认证凭证或手动输入用户名和密码');
       return;
     }
 
     setIsSubmitting(true);
     try {
+      // 构建提交数据，移除空字符串和未使用的字段
+      const submitData: Record<string, any> = {
+        name: formData.name,
+        ip_address: formData.ip_address,
+        vendor: formData.vendor,
+        ssh_port: formData.ssh_port || 22,
+      };
+      
+      // 可选字段，只在有值时添加
+      if (formData.model) submitData.model = formData.model;
+      if (formData.os_version) submitData.os_version = formData.os_version;
+      if (formData.location) submitData.location = formData.location;
+      if (formData.role) submitData.role = formData.role;
+      if (formData.enable_password) submitData.enable_password = formData.enable_password;
+      
+      // 根据认证方式添加相应字段
+      if (useCredential && formData.ssh_key_id) {
+        submitData.ssh_key_id = formData.ssh_key_id;
+      } else {
+        submitData.username = formData.username;
+        if (!isEditing || formData.password) {
+          submitData.password = formData.password;
+        }
+      }
+      
+      console.log('Submitting device data:', submitData);
+      
       if (isEditing && device?.id) {
-        await api.put(`/network-devices/${device.id}`, formData);
+        await api.put(`/api/network-devices/${device.id}`, submitData);
         toast.success('设备更新成功');
       } else {
-        await api.post('/network-devices', formData);
+        await api.post('/api/network-devices', submitData);
         toast.success('设备添加成功');
       }
       onSuccess();
     } catch (error: any) {
-      toast.error(error.response?.data?.error || '操作失败');
+      console.error('Save device error:', error);
+      console.error('Error response:', error.response?.data);
+      toast.error(error.response?.data?.error || error.response?.data?.message || '操作失败');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleTestConnection = async () => {
-    if (!formData.ip_address || !formData.username || !formData.password) {
-      toast.error('请先填写 IP 地址、用户名和密码');
+    if (!formData.ip_address) {
+      toast.error('请先填写 IP 地址');
+      return;
+    }
+
+    // 如果使用凭证，获取凭证中的认证信息
+    let testUsername = formData.username;
+    let testPassword = formData.password;
+    
+    if (useCredential && formData.ssh_key_id) {
+      const selectedCred = credentials.find((c: Credential) => c.id === formData.ssh_key_id);
+      if (selectedCred && selectedCred.auth_type === 'password') {
+        testUsername = selectedCred.username || '';
+        // 密码需要后端解密，这里简化处理
+        toast.info('使用凭证测试连接需要保存后执行');
+        return;
+      }
+    }
+
+    if (!testUsername || !testPassword) {
+      toast.error('请先填写用户名和密码');
       return;
     }
 
@@ -98,8 +174,8 @@ export default function AddDeviceModal({ device, onClose, onSuccess }: AddDevice
       const response = await api.post('/network-devices/test-connection', {
         ip_address: formData.ip_address,
         ssh_port: formData.ssh_port,
-        username: formData.username,
-        password: formData.password
+        username: testUsername,
+        password: testPassword
       });
       
       setTestResult({
@@ -196,31 +272,89 @@ export default function AddDeviceModal({ device, onClose, onSuccess }: AddDevice
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">用户名 <span className="text-red-500">*</span></label>
-              <input
-                type="text"
-                value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                placeholder="admin"
-                className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md text-text-primary placeholder-text-secondary/50 focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
-                required
-              />
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-text-primary mb-2">认证方式</label>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setUseCredential(true)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
+                    useCredential
+                      ? 'bg-primary/10 border-primary text-primary'
+                      : 'bg-background border-border text-text-secondary hover:border-primary/50'
+                  }`}
+                >
+                  <Key className="w-4 h-4" />
+                  选择凭证
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUseCredential(false)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
+                    !useCredential
+                      ? 'bg-orange-500/10 border-orange-500 text-orange-500'
+                      : 'bg-background border-border text-text-secondary hover:border-orange-500/50'
+                  }`}
+                >
+                  <User className="w-4 h-4" />
+                  手动输入
+                </button>
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">
-                密码 {!isEditing && <span className="text-red-500">*</span>}
-              </label>
-              <input
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder={isEditing ? '留空则不修改' : '设备登录密码'}
-                className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md text-text-primary placeholder-text-secondary/50 focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
-                required={!isEditing}
-              />
-            </div>
+            {useCredential ? (
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-text-primary mb-1">
+                  认证凭证 <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.ssh_key_id}
+                  onChange={(e) => setFormData({ ...formData, ssh_key_id: e.target.value })}
+                  className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md text-text-primary focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
+                  required
+                >
+                  <option value="">请选择认证凭证</option>
+                  {credentials
+                    .filter((c: Credential) => c.auth_type === 'password')
+                    .map((cred: Credential) => (
+                      <option key={cred.id} value={cred.id}>
+                        {cred.name} ({cred.username || '无用户名'})
+                      </option>
+                    ))}
+                </select>
+                <p className="mt-1 text-xs text-text-secondary/60">
+                  仅显示账号密码类型的凭证
+                </p>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-1">用户名 <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    value={formData.username}
+                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                    placeholder="admin"
+                    className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md text-text-primary placeholder-text-secondary/50 focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
+                    required={!useCredential}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-1">
+                    密码 {!isEditing && <span className="text-red-500">*</span>}
+                  </label>
+                  <input
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder={isEditing ? '留空则不修改' : '设备登录密码'}
+                    className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md text-text-primary placeholder-text-secondary/50 focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
+                    required={!isEditing && !useCredential}
+                  />
+                </div>
+              </>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-text-primary mb-1">Enable 密码</label>

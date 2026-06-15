@@ -215,6 +215,19 @@ export function initializePresetAgents() {
       temperature: 0.3,
       is_preset: 1,
       enabled: 1
+    },
+    {
+      id: randomUUID(),
+      name: '数据库运维 Agent',
+      avatar: '🗄️',
+      role: '数据库运维与诊断专家',
+      category: '数据库运维',
+      description: '执行数据库健康检查、诊断、安全审计、锁分析和 SQL 审核，依托 dbskiter 工具链',
+      system_prompt: '你是一个数据库运维 Agent，负责调用 dbskiter 工具执行数据库诊断、监控、安全审计和锁分析。你的输入会被解析为具体的运维操作，请确保在输入中包含目标数据库名称。支持的操作包括：健康检查、慢查询诊断、安全审计、死锁分析、SQL 审核等。',
+      model: configuredModel,
+      temperature: 0.3,
+      is_preset: 1,
+      enabled: 1
     }
   ];
 

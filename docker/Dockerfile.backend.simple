@@ -24,6 +24,14 @@ ENV NODE_ENV=production
 ENV PORT=3001
 ENV HOST=0.0.0.0
 
+# 安装 Python 和 pip（dbskiter 依赖），构建时失败不阻塞镜像构建
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+RUN python3 -m pip install --upgrade pip || true
+RUN python3 -m pip install dbskiter || true
+
 # 创建数据目录
 RUN mkdir -p /app/data
 
