@@ -59,7 +59,8 @@ api.interceptors.response.use(
     const originalRequest = error.config;
 
     if (error.response?.status === 401 && !originalRequest._retry) {
-      if (originalRequest.url?.includes('/auth/refresh') || originalRequest.url?.includes('/auth/login')) {
+      if (originalRequest.url?.includes('/auth/login')) { return Promise.reject(error); }
+      if (originalRequest.url?.includes('/auth/refresh')) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         localStorage.removeItem('refreshToken');
