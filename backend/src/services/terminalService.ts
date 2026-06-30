@@ -10,10 +10,11 @@ export interface TerminalSession {
   conn: Client;
   shell: ClientChannel;
   createdAt: Date;
+  lastActivity: Date;
 }
 
 const activeSessions = new Map<string, TerminalSession>();
-const SESSION_TTL_MS = 30 * 60 * 1000;
+const SESSION_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours idle timeout
 const SESSION_MAX_COUNT = 100;
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -35,7 +36,7 @@ const cleanupTimer = setInterval(() => {
   }
   
   for (const [id, session] of activeSessions.entries()) {
-    if (now - session.createdAt.getTime() > SESSION_TTL_MS) {
+    if (now - session.lastActivity.getTime() > SESSION_TTL_MS) {
       try { session.shell.end(); } catch { /* ignore */ }
       try { session.conn.end(); } catch { /* ignore */ }
       activeSessions.delete(id);
@@ -64,7 +65,7 @@ interface ServerInfo {
 export class TerminalService {
   private static readonly CONNECT_TIMEOUT = 60000;
   private static readonly KEEPALIVE_INTERVAL = 10000;  // Send keepalive every 10 seconds
-  private static readonly KEEPALIVE_MAX = 360;         // Allow missing up to 360 keepalives (1 hour) before dropping
+  private static readonly KEEPALIVE_MAX = 2160;        // Allow missing up to 2160 keepalives (6 hours) before dropping
 
   async createTerminalSession(
     serverId: string,
@@ -136,7 +137,8 @@ export class TerminalService {
               serverId,
               conn,
               shell: stream,
-              createdAt: new Date()
+              createdAt: new Date(),
+              lastActivity: new Date()
             });
 
             logger.info(`Terminal session ${sessionId} created for server ${server.name}`);
@@ -222,6 +224,7 @@ export class TerminalService {
 
     try {
       session.shell.setWindow(rows, cols, 0, 0);
+      session.lastActivity = new Date();
       return true;
     } catch {
       return false;
@@ -249,6 +252,7 @@ export class TerminalService {
 
     try {
       session.shell.write(data);
+      session.lastActivity = new Date();
       return { success: true };
     } catch {
       return { success: false, reason: 'Failed to send data' };
