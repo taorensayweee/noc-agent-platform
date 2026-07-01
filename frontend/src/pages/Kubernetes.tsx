@@ -438,6 +438,15 @@ export default function Kubernetes() {
     }
   }, [activeTab, istioSub, rNodes, rDeploys, rPods, rSvcs, rIngresses, rGateways, rVS, rDR]);
 
+  // Re-fetch current tab data when namespace filter changes
+  const handleRefreshRef = useRef(handleRefresh);
+  handleRefreshRef.current = handleRefresh;
+  useEffect(() => {
+    if (!selectedCluster) return;
+    handleRefreshRef.current();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedNs, selectedCluster]);
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -530,10 +539,31 @@ export default function Kubernetes() {
           )}
         </div>
 
-        <select value={selectedNs} onChange={e => setSelectedNs(e.target.value)} disabled={!selectedCluster || activeTab === 'nodes'} className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-700 dark:text-gray-300 disabled:opacity-50">
-          <option value="">全部 Namespace</option>
-          {namespaces.map((ns: any) => <option key={ns.name} value={ns.name}>{ns.name}</option>)}
-        </select>
+        <div className="flex items-center gap-1">
+          <select
+            value={selectedNs}
+            onChange={e => setSelectedNs(e.target.value)}
+            disabled={!selectedCluster || activeTab === 'nodes'}
+            className={clsx(
+              'px-3 py-2 border rounded-lg text-sm transition-colors disabled:opacity-50',
+              selectedNs
+                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-400 dark:border-blue-500 text-blue-700 dark:text-blue-300 font-medium'
+                : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300'
+            )}
+          >
+            <option value="">全部 Namespace</option>
+            {namespaces.map((ns: any) => <option key={ns.name} value={ns.name}>{ns.name}</option>)}
+          </select>
+          {selectedNs && (
+            <button
+              onClick={() => setSelectedNs('')}
+              title="清除 Namespace 筛选"
+              className="p-1.5 text-blue-400 hover:text-red-500 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
 
         <button onClick={handleRefresh} disabled={!selectedCluster || isLoading} className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50">
           <RefreshCw className={clsx('w-4 h-4', isLoading && 'animate-spin')} /> 刷新
