@@ -4,11 +4,13 @@ import { env } from '../utils/env';
 import { logger } from '../utils/logger';
 import db from '../models/database';
 import { terminalService } from '../services/terminalService';
+import { kubernetesService } from '../services/kubernetesService';
 import type { User } from '../types';
 
 interface SocketWithUser extends Socket {
   user?: User;
   terminalSessionIds?: Set<string>;
+  k8sExecSessionIds?: Set<string>;
 }
 
 const taskRooms = new Map<string, Set<string>>();
@@ -47,6 +49,7 @@ export function setupWebSocket(io: SocketIOServer) {
   io.on('connection', (socket: Socket) => {
     const user = (socket as SocketWithUser).user;
     (socket as SocketWithUser).terminalSessionIds = new Set();
+    (socket as SocketWithUser).k8sExecSessionIds = new Set();
     logger.info(`🔌 Client connected: ${socket.id} (User: ${user?.username})`);
 
     socket.on('task:subscribe', (taskId: string) => {
@@ -130,6 +133,40 @@ export function setupWebSocket(io: SocketIOServer) {
       // Just acknowledge quietly
     });
 
+    // ── K8s Pod Exec ──────────────────────────────────────────────────────
+
+    socket.on('k8s:exec:open', async (
+      data: { clusterId: string; namespace: string; podName: string; containerName: string; cols: number; rows: number },
+      callback: (result: { sessionId?: string; error?: string }) => void
+    ) => {
+      try {
+        const sessionId = await kubernetesService.openExecSession(
+          data.clusterId, data.namespace, data.podName, data.containerName,
+          (chunk) => socket.emit('k8s:exec:data', { sessionId, data: chunk }),
+          () => socket.emit('k8s:exec:close', { sessionId })
+        );
+        (socket as SocketWithUser).k8sExecSessionIds!.add(sessionId);
+        // Send initial resize
+        if (data.cols && data.rows) kubernetesService.resizeExecTerminal(sessionId, data.cols, data.rows);
+        callback({ sessionId });
+      } catch (err: any) {
+        callback({ error: err.message });
+      }
+    });
+
+    socket.on('k8s:exec:data', (data: { sessionId: string; data: string }) => {
+      kubernetesService.sendExecData(data.sessionId, data.data);
+    });
+
+    socket.on('k8s:exec:resize', (data: { sessionId: string; cols: number; rows: number }) => {
+      kubernetesService.resizeExecTerminal(data.sessionId, data.cols, data.rows);
+    });
+
+    socket.on('k8s:exec:close', (data: { sessionId: string }) => {
+      kubernetesService.closeExecSession(data.sessionId);
+      (socket as SocketWithUser).k8sExecSessionIds!.delete(data.sessionId);
+    });
+
     socket.on('disconnect', () => {
       logger.info(`❌ Client disconnected: ${socket.id}`);
       taskRooms.forEach((sockets, taskId) => {
@@ -142,10 +179,13 @@ export function setupWebSocket(io: SocketIOServer) {
       const sock = socket as SocketWithUser;
       const sessions = sock.terminalSessionIds;
       if (sessions) {
-        sessions.forEach((sessionId) => {
-          terminalService.closeTerminalSession(sessionId);
-        });
+        sessions.forEach((sessionId) => terminalService.closeTerminalSession(sessionId));
         sock.terminalSessionIds = new Set();
+      }
+      const execSessions = sock.k8sExecSessionIds;
+      if (execSessions) {
+        execSessions.forEach((sessionId) => kubernetesService.closeExecSession(sessionId));
+        sock.k8sExecSessionIds = new Set();
       }
     });
   });

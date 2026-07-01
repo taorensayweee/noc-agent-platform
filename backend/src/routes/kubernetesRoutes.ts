@@ -5,132 +5,134 @@ import { logger } from '../utils/logger';
 
 const router = Router();
 
+const handleErr = (res: Response, e: any, fallback = '操作失败') => {
+  const msg = e?.body?.message || e?.message || fallback;
+  logger.error(`K8s API error: ${msg}`);
+  res.status(500).json({ success: false, error: msg });
+};
+
 // ── Cluster CRUD ──────────────────────────────────────────────────────────────
 
-router.get('/clusters', (_req: Request, res: Response) => {
-  try {
-    const clusters = kubernetesService.listClusters();
-    res.json({ success: true, data: clusters });
-  } catch (e: any) {
-    logger.error('List k8s clusters error:', e);
-    res.status(500).json({ success: false, error: e.message });
-  }
+router.get('/clusters', (_req, res) => {
+  try { res.json({ success: true, data: kubernetesService.listClusters() }); }
+  catch (e: any) { handleErr(res, e); }
 });
 
-router.post('/clusters', requireRole('admin'), (req: Request, res: Response) => {
+router.post('/clusters', requireRole('admin'), (req, res) => {
   const { name, apiUrl, token, caBase64, skipTlsVerify, description } = req.body;
-  if (!name || !apiUrl || !token) {
-    return res.status(400).json({ success: false, error: '名称、API地址、Token 为必填项' });
-  }
-  try {
-    const cluster = kubernetesService.createCluster({ name, apiUrl, token, caBase64, skipTlsVerify, description });
-    res.status(201).json({ success: true, data: cluster });
-  } catch (e: any) {
-    logger.error('Create k8s cluster error:', e);
-    res.status(500).json({ success: false, error: e.message });
-  }
+  if (!name || !apiUrl || !token) return res.status(400).json({ success: false, error: '名称、API地址、Token 为必填项' });
+  try { res.status(201).json({ success: true, data: kubernetesService.createCluster({ name, apiUrl, token, caBase64, skipTlsVerify, description }) }); }
+  catch (e: any) { handleErr(res, e); }
 });
 
-router.put('/clusters/:id', requireRole('admin'), (req: Request, res: Response) => {
-  const { id } = req.params;
-  try {
-    const ok = kubernetesService.updateCluster(id, req.body);
-    if (!ok) return res.status(404).json({ success: false, error: '集群不存在' });
-    res.json({ success: true });
-  } catch (e: any) {
-    logger.error('Update k8s cluster error:', e);
-    res.status(500).json({ success: false, error: e.message });
-  }
+router.put('/clusters/:id', requireRole('admin'), (req, res) => {
+  const ok = kubernetesService.updateCluster(req.params.id, req.body);
+  if (!ok) return res.status(404).json({ success: false, error: '集群不存在' });
+  res.json({ success: true });
 });
 
-router.delete('/clusters/:id', requireRole('admin'), (req: Request, res: Response) => {
-  const { id } = req.params;
-  try {
-    const ok = kubernetesService.deleteCluster(id);
-    if (!ok) return res.status(404).json({ success: false, error: '集群不存在' });
-    res.json({ success: true });
-  } catch (e: any) {
-    logger.error('Delete k8s cluster error:', e);
-    res.status(500).json({ success: false, error: e.message });
-  }
+router.delete('/clusters/:id', requireRole('admin'), (req, res) => {
+  const ok = kubernetesService.deleteCluster(req.params.id);
+  if (!ok) return res.status(404).json({ success: false, error: '集群不存在' });
+  res.json({ success: true });
 });
 
-router.post('/clusters/:id/test', async (req: Request, res: Response) => {
-  const { id } = req.params;
-  try {
-    const result = await kubernetesService.testConnection(id);
-    res.json({ success: true, data: result });
-  } catch (e: any) {
-    res.status(500).json({ success: false, error: e.message });
-  }
+router.post('/clusters/:id/test', async (req, res) => {
+  try { res.json({ success: true, data: await kubernetesService.testConnection(req.params.id) }); }
+  catch (e: any) { handleErr(res, e); }
 });
 
-// ── K8s Resources ─────────────────────────────────────────────────────────────
+// ── Core Resources ─────────────────────────────────────────────────────────────
 
-router.get('/clusters/:id/namespaces', async (_req: Request, res: Response) => {
-  try {
-    const data = await kubernetesService.listNamespaces(_req.params.id);
-    res.json({ success: true, data });
-  } catch (e: any) {
-    logger.error('List namespaces error:', e);
-    res.status(500).json({ success: false, error: e?.body?.message || e.message });
-  }
+router.get('/clusters/:id/namespaces', async (req, res) => {
+  try { res.json({ success: true, data: await kubernetesService.listNamespaces(req.params.id) }); }
+  catch (e: any) { handleErr(res, e); }
 });
 
-router.get('/clusters/:id/nodes', async (req: Request, res: Response) => {
-  try {
-    const data = await kubernetesService.listNodes(req.params.id);
-    res.json({ success: true, data });
-  } catch (e: any) {
-    logger.error('List nodes error:', e);
-    res.status(500).json({ success: false, error: e?.body?.message || e.message });
-  }
+router.get('/clusters/:id/nodes', async (req, res) => {
+  try { res.json({ success: true, data: await kubernetesService.listNodes(req.params.id) }); }
+  catch (e: any) { handleErr(res, e); }
 });
 
-router.get('/clusters/:id/pods', async (req: Request, res: Response) => {
-  const namespace = req.query.namespace as string | undefined;
-  try {
-    const data = await kubernetesService.listPods(req.params.id, namespace);
-    res.json({ success: true, data });
-  } catch (e: any) {
-    logger.error('List pods error:', e);
-    res.status(500).json({ success: false, error: e?.body?.message || e.message });
-  }
+router.get('/clusters/:id/pods', async (req, res) => {
+  try { res.json({ success: true, data: await kubernetesService.listPods(req.params.id, req.query.namespace as string) }); }
+  catch (e: any) { handleErr(res, e); }
 });
 
-router.get('/clusters/:id/deployments', async (req: Request, res: Response) => {
-  const namespace = req.query.namespace as string | undefined;
-  try {
-    const data = await kubernetesService.listDeployments(req.params.id, namespace);
-    res.json({ success: true, data });
-  } catch (e: any) {
-    logger.error('List deployments error:', e);
-    res.status(500).json({ success: false, error: e?.body?.message || e.message });
-  }
+router.get('/clusters/:id/deployments', async (req, res) => {
+  try { res.json({ success: true, data: await kubernetesService.listDeployments(req.params.id, req.query.namespace as string) }); }
+  catch (e: any) { handleErr(res, e); }
 });
 
-router.get('/clusters/:id/services', async (req: Request, res: Response) => {
-  const namespace = req.query.namespace as string | undefined;
-  try {
-    const data = await kubernetesService.listServices(req.params.id, namespace);
-    res.json({ success: true, data });
-  } catch (e: any) {
-    logger.error('List services error:', e);
-    res.status(500).json({ success: false, error: e?.body?.message || e.message });
-  }
+router.get('/clusters/:id/services', async (req, res) => {
+  try { res.json({ success: true, data: await kubernetesService.listServices(req.params.id, req.query.namespace as string) }); }
+  catch (e: any) { handleErr(res, e); }
 });
 
-router.get('/clusters/:id/pods/:namespace/:podName/logs', async (req: Request, res: Response) => {
+router.get('/clusters/:id/pods/:namespace/:podName/logs', async (req, res) => {
   const { id, namespace, podName } = req.params;
-  const container = req.query.container as string | undefined;
-  const tail = parseInt(req.query.tail as string) || 200;
   try {
-    const logs = await kubernetesService.getPodLogs(id, namespace, podName, container, tail);
+    const logs = await kubernetesService.getPodLogs(id, namespace, podName, req.query.container as string, parseInt(req.query.tail as string) || 200);
     res.json({ success: true, data: logs });
-  } catch (e: any) {
-    logger.error('Get pod logs error:', e);
-    res.status(500).json({ success: false, error: e?.body?.message || e.message });
-  }
+  } catch (e: any) { handleErr(res, e); }
+});
+
+// ── Ingress ────────────────────────────────────────────────────────────────────
+
+router.get('/clusters/:id/ingresses', async (req, res) => {
+  try { res.json({ success: true, data: await kubernetesService.listIngresses(req.params.id, req.query.namespace as string) }); }
+  catch (e: any) { handleErr(res, e); }
+});
+
+// ── Istio Resources ────────────────────────────────────────────────────────────
+
+router.get('/clusters/:id/gateways', async (req, res) => {
+  try { res.json({ success: true, data: await kubernetesService.listIstioResources(req.params.id, 'Gateway', req.query.namespace as string) }); }
+  catch (e: any) { handleErr(res, e); }
+});
+
+router.get('/clusters/:id/virtualservices', async (req, res) => {
+  try { res.json({ success: true, data: await kubernetesService.listIstioResources(req.params.id, 'VirtualService', req.query.namespace as string) }); }
+  catch (e: any) { handleErr(res, e); }
+});
+
+router.get('/clusters/:id/destinationrules', async (req, res) => {
+  try { res.json({ success: true, data: await kubernetesService.listIstioResources(req.params.id, 'DestinationRule', req.query.namespace as string) }); }
+  catch (e: any) { handleErr(res, e); }
+});
+
+// ── Generic Resource Get / Edit / Delete ───────────────────────────────────────
+
+router.get('/clusters/:id/resources/:kind/:namespace/:name', async (req, res) => {
+  const { id, kind, namespace, name } = req.params;
+  try { res.json({ success: true, data: await kubernetesService.getResource(id, kind, namespace, name) }); }
+  catch (e: any) { handleErr(res, e); }
+});
+
+router.put('/clusters/:id/resources/:kind/:namespace/:name', requireRole('admin', 'operator'), async (req, res) => {
+  const { id, kind, namespace, name } = req.params;
+  try {
+    await kubernetesService.replaceResource(id, kind, namespace, name, req.body);
+    res.json({ success: true });
+  } catch (e: any) { handleErr(res, e); }
+});
+
+router.delete('/clusters/:id/resources/:kind/:namespace/:name', requireRole('admin', 'operator'), async (req, res) => {
+  const { id, kind, namespace, name } = req.params;
+  try {
+    await kubernetesService.deleteResource(id, kind, namespace, name);
+    res.json({ success: true });
+  } catch (e: any) { handleErr(res, e); }
+});
+
+// ── Deployment Restart ─────────────────────────────────────────────────────────
+
+router.post('/clusters/:id/deployments/:namespace/:name/restart', requireRole('admin', 'operator'), async (req, res) => {
+  const { id, namespace, name } = req.params;
+  try {
+    await kubernetesService.restartDeployment(id, namespace, name);
+    res.json({ success: true });
+  } catch (e: any) { handleErr(res, e); }
 });
 
 export default router;
