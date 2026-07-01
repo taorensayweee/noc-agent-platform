@@ -44,6 +44,7 @@ import {
   ShieldCheck,
   BookMarked,
   Cog,
+  Container,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../../contexts/AuthContext';
@@ -74,6 +75,7 @@ const navigationGroups = [
 
       { name: 'Web 终端', href: '/terminal', icon: Terminal },
       { name: '远程桌面', href: '/remote-desktop', icon: MonitorPlay },
+      { name: 'K8s 集群', href: '/kubernetes', icon: Container },
     ]
   },
   {

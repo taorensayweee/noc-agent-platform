@@ -42,6 +42,7 @@ import NetworkDevices from './pages/NetworkDevices';
 import DbConnections from './pages/DbConnections';
 import SSHKeys from './pages/SSHKeys';
 import AIModels from './pages/AIModels';
+import Kubernetes from './pages/Kubernetes';
 import NotFound from './pages/NotFound';
 
 const queryClient = new QueryClient({
@@ -100,6 +101,7 @@ function App() {
               <Route path="ai-root-cause/:id" element={<ProtectedRoute><RCADetail /></ProtectedRoute>} />
               <Route path="remediation-workbench" element={<ProtectedRoute><RemediationWorkbench /></ProtectedRoute>} />
               <Route path="ai-insights" element={<ProtectedRoute><AIInsights /></ProtectedRoute>} />
+              <Route path="kubernetes" element={<ProtectedRoute><Kubernetes /></ProtectedRoute>} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
